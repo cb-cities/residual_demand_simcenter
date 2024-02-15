@@ -53,7 +53,6 @@ def substep_assignment(nodes_df=None, weighted_edges_df=None, od_ss=None, quarte
     edge_travel_time_dict = weighted_edges_df['t_avg'].T.to_dict()
     edge_current_vehicles = weighted_edges_df['veh_current'].T.to_dict()
     edge_quarter_vol = weighted_edges_df['vol_true'].T.to_dict()
-    edge_cost_dict = weighted_edges_df['cost'].T.to_dict()
     # edge_length_dict = weighted_edges_df['length'].T.to_dict()
     od_residual_ss_list = []
     # all_paths = []
@@ -69,7 +68,6 @@ def substep_assignment(nodes_df=None, weighted_edges_df=None, od_ss=None, quarte
         trip_origin = nodes_origin[path_i]
         trip_destin = nodes_destin[path_i]
         agent_id = agent_ids[path_i]
-        agent_use_highway = 0
         ### remove some agent (path too long)
         if agent_id in remove_agent_list:
             path_i += 1
@@ -78,30 +76,20 @@ def substep_assignment(nodes_df=None, weighted_edges_df=None, od_ss=None, quarte
         remaining_time = 3600/quarter_counts + agent_current_link_times[path_i]
         # remaining_time = 36000
         used_time = 0
-        cost = 0
         for edge_s, edge_e in zip(p, p[1:]):
             edge_str = "{}-{}".format(edge_s, edge_e)
             edge_travel_time = edge_travel_time_dict[edge_str]
-            edge_travel_cost = edge_cost_dict[edge_str]
             
             if (remaining_time > edge_travel_time) and (edge_travel_time < 36000):
                 # all_paths.append(edge_str)
                 # p_dist += edge_travel_time
                 remaining_time -= edge_travel_time
                 used_time += edge_travel_time
-                cost += edge_travel_cost
                 edge_quarter_vol[edge_str] += (1 * sample_interval)
                 trip_stop = edge_e
                 
                 if edge_str == agent_current_links[path_i]:
                     edge_current_vehicles[edge_str] -= (1 * sample_interval)
-                if edge_str in highway_list:
-                    agent_use_highway += 1
-                # if agent_id in agents_path.keys():
-                #     agents_path[agent_id].append([hour, quarter, ss_id, edge_str, edge_travel_time, edge_length_dict[edge_str]/edge_travel_time, used_time])
-                    # if agent_id == 6644860:
-                    #     print(agent_id, hour, quarter, ss_id, edge_str, remaining_time, edge_travel_time, used_time)
-                # print('1: ', trip_origin, trip_destin, edge_s, edge_e, trip_stop)
             else:
                 if edge_str != agent_current_links[path_i]:
                     edge_current_vehicles[edge_str] += (1 * sample_interval)
@@ -109,30 +97,16 @@ def substep_assignment(nodes_df=None, weighted_edges_df=None, od_ss=None, quarte
                 new_current_link_time = remaining_time
                 trip_stop = edge_s
                 od_residual_ss_list.append([agent_id, trip_origin, trip_destin, trip_stop, new_current_link, new_current_link_time])
-                # go_probability = remaining_time/edge_travel_time
-                # if random.uniform(0, 1) < go_probability:
-                #     all_paths.append(edge_str)
-                #     od_residual_ss_list.append([agent_ids[path_i], edge_e, p[-1], None, None])
-                # else:
-                #     new_current_link = edge_str
-                #     new_current_link_time = remaining_time
-                #     od_residual_ss_list.append([agent_ids[path_i], edge_s, p[-1], new_current_link, new_current_link_time])
-                # print('2: ', trip_origin, trip_destin, edge_s, edge_e, trip_stop)
                 break
         trip_info[(agent_id, trip_origin, trip_destin)][0] += 3600/quarter_counts
         trip_info[(agent_id, trip_origin, trip_destin)][1] += used_time
         trip_info[(agent_id, trip_origin, trip_destin)][2] = trip_stop
-        trip_info[(agent_id, trip_origin, trip_destin)][3] += agent_use_highway
-        trip_info[(agent_id, trip_origin, trip_destin)][4] = hour
-        trip_info[(agent_id, trip_origin, trip_destin)][5] = quarter
-        trip_info[(agent_id, trip_origin, trip_destin)][6] = ss_id
-        trip_info[(agent_id, trip_origin, trip_destin)][7] += cost
-        # print('ss: ', trip_origin, trip_destin, edge_s, edge_e, trip_stop)
+        trip_info[(agent_id, trip_origin, trip_destin)][3] = hour
+        trip_info[(agent_id, trip_origin, trip_destin)][4] = quarter
+        trip_info[(agent_id, trip_origin, trip_destin)][5] = ss_id
         path_i += 1
-
-    # edge_volume = pd.DataFrame(all_paths, columns=['edge_str']).groupby('edge_str').size().to_frame(name=['vol_ss'])
     
-    new_edges_df = weighted_edges_df[['u', 'v', 'start_nid', 'end_nid', 'fft', 'capacity', 'normal_fft', 'normal_capacity', 'length', 'is_highway', 'vol_true', 'vol_tot', 'veh_current', 'cost', 'geometry']].copy()
+    new_edges_df = weighted_edges_df[['u', 'v', 'start_nid', 'end_nid', 'fft', 'capacity', 'normal_fft', 'normal_capacity', 'length', 'vol_true', 'vol_tot', 'veh_current', 'geometry']].copy()
     # new_edges_df = new_edges_df.join(edge_volume, how='left')
     # new_edges_df['vol_ss'] = new_edges_df['vol_ss'].fillna(0)
     # new_edges_df['vol_true'] += new_edges_df['vol_ss']
@@ -247,12 +221,12 @@ def assignment(quarter_counts=6, substep_counts=15, substep_size=30000, edges_df
                     ### calculate weight
                     weighted_edges_df = edges_df.copy()
                     ### weight by travel distance
-                    weighted_edges_df['weight'] = edges_df['length']
+                    #weighted_edges_df['weight'] = edges_df['length']
                     ### weight by travel time
                     # weighted_edges_df['weight'] = edges_df['t_avg']
                     ### weight by travel time
                     # weighted_edges_df['weight'] = (edges_df['t_avg'] - edges_df['fft']) * 0.5 + edges_df['length']*0.1 #+ cost_factor*edges_df['length']*0.1*(edges_df['is_highway']) ### 10 yen per 100 m --> 0.1 yen per m
-                    # weighted_edges_df['weight'] = edges_df['t_avg']
+                    weighted_edges_df['weight'] = edges_df['t_avg']
                     # weighted_edges_df['weight'] = np.where(weighted_edges_df['weight']<0.1, 0.1, weighted_edges_df['weight'])
 
                     ### traffic assignment with truncated path
@@ -278,7 +252,7 @@ def assignment(quarter_counts=6, substep_counts=15, substep_size=30000, edges_df
                     # tmp_df['weights_{}'.format(ss_id)] = edges_df['t_avg']
                     # tmp_df['vol_{}'.format(ss_id)] = edges_df['vol_true']
                     # tmp_df['flow_{}'.format(ss_id)] = edges_df['flow']
-                    logging.info('HR {} QT {} SS {} finished, max vol {}, max hwy vol {}, time {}'.format(hour, quarter, ss_id, np.max(edges_df['vol_true']), np.max(edges_df.loc[edges_df['is_highway']==1, 'vol_true']), time.time()-time_ss_0))
+                    logging.info('HR {} QT {} SS {} finished, max vol {}, time {}'.format(hour, quarter, ss_id, np.max(edges_df['vol_true']), time.time()-time_ss_0))
                     # sys.exit(0)
                     # break
                 
@@ -290,13 +264,13 @@ def assignment(quarter_counts=6, substep_counts=15, substep_size=30000, edges_df
                     # tmp_df.to_csv(simulation_outputs+'/edge_vol/edge_vol_hr{}_qt{}_{}.csv'.format(hour, quarter, scen_nm), index=False)
 
             if hour%3 == 0:
-                trip_info_df = pd.DataFrame([[trip_key[0], trip_key[1], trip_key[2], trip_value[0], trip_value[1], trip_value[2], trip_value[3], trip_value[4], trip_value[5], trip_value[6], trip_value[7]] for trip_key, trip_value in trip_info.items()], columns=['agent_id', 'origin_nid', 'destin_nid', 'travel_time', 'travel_time_used', 'stop_nid', 'use_highway', 'stop_hour', 'stop_quarter', 'stop_ssid', 'cost'])
+                trip_info_df = pd.DataFrame([[trip_key[0], trip_key[1], trip_key[2], trip_value[0], trip_value[1], trip_value[2], trip_value[3], trip_value[4], trip_value[5]] for trip_key, trip_value in trip_info.items()], columns=['agent_id', 'origin_nid', 'destin_nid', 'travel_time', 'travel_time_used', 'stop_nid', 'stop_hour', 'stop_quarter', 'stop_ssid'])
                 trip_info_df.to_csv(simulation_outputs+'/trip_info/trip_info_{}_hr{}.csv'.format(scen_nm, hour), index=False)
         # plot_edge_flow(edges_df=edges_df, simulation_outputs=simulation_outputs, quarter=quarter, hour=hour, scen_nm=scen_nm, var='vol_tot')
     
     ### output individual trip travel time and stop location
 
-    trip_info_df = pd.DataFrame([[trip_key[0], trip_key[1], trip_key[2], trip_value[0], trip_value[1], trip_value[2], trip_value[3], trip_value[4], trip_value[5], trip_value[6], trip_value[7]] for trip_key, trip_value in trip_info.items()], columns=['agent_id', 'origin_nid', 'destin_nid', 'travel_time', 'travel_time_used', 'stop_nid', 'use_highway', 'stop_hour', 'stop_quarter', 'stop_ssid', 'cost'])
+    trip_info_df = pd.DataFrame([[trip_key[0], trip_key[1], trip_key[2], trip_value[0], trip_value[1], trip_value[2], trip_value[3], trip_value[4], trip_value[5]] for trip_key, trip_value in trip_info.items()], columns=['agent_id', 'origin_nid', 'destin_nid', 'travel_time', 'travel_time_used', 'stop_nid', 'stop_hour', 'stop_quarter', 'stop_ssid'])
     trip_info_df.to_csv(simulation_outputs+'/trip_info/trip_info_{}.csv'.format(scen_nm), index=False)
 
     # with open(simulation_outputs+'/trip_info/agents_path_{}.json'.format(scen_nm), 'w+') as outfile:
