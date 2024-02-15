@@ -1,6 +1,6 @@
 # Semi-dynamic traffic assignment with residual demand for SimCenter R2D
 
-![Bay Area Congestion](bayarea_congestion.jpg)
+![Bay_Area_Congestion](bayarea_congestion.jpg)
 
 ### Features
 * Quasi-equilibrium traffic assignment
