@@ -1,0 +1,10 @@
+name: residual_demand
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.8
+  - geopandas=0.8.1
+  - matplotlib=3.3.1
+  - numpy=1.19.4
+
