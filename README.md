@@ -13,9 +13,9 @@
 
 ### Input Data
 * Road Network
-*   nodes.csv
-*   edges.csv
-*   closed_edges.csv (designed for disruptive events)
+  * nodes.csv
+  * edges.csv
+  * closed_edges.csv (designed for disruptive events)
 * Demand
 *   OD.csv
 
