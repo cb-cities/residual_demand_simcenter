@@ -1,5 +1,7 @@
 # Semi-dynamic traffic assignment with residual demand for SimCenter R2D
 
+![Bay Area Congestion](/images/bayarea_congestion.jpg)
+
 ### Features
 * Quasi-equilibrium traffic assignment
 * Efficient routing for millions of trips using [contraction hierarchy](https://github.com/UDST/pandana/blob/dev/examples/shortest_path_example.py) and priority-queue based Dijkstra algorithm [sp](https://github.com/cb-cities/sp)
