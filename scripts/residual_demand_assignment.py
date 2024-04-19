@@ -58,13 +58,6 @@ def substep_assignment(nodes_df=None, weighted_edges_df=None, od_ss=None, quarte
     # all_paths = []
     path_i = 0
     for p in paths:
-        # p_length = path_lengths[path_i]
-        # if p_length >= 36000:
-        #     trip_info[(agent_id, trip_origin, trip_destin)][0] = 'too_long'
-        #     path_i += 1
-        #     continue
-        # p_dist = -current_link_times[path_i]
-        # remaining_time = 3600/quarter_counts - p_dist
         trip_origin = nodes_origin[path_i]
         trip_destin = nodes_destin[path_i]
         agent_id = agent_ids[path_i]
@@ -74,7 +67,6 @@ def substep_assignment(nodes_df=None, weighted_edges_df=None, od_ss=None, quarte
             # no need to update trip info
             continue
         remaining_time = 3600/quarter_counts + agent_current_link_times[path_i]
-        # remaining_time = 36000
         used_time = 0
         for edge_s, edge_e in zip(p, p[1:]):
             edge_str = "{}-{}".format(edge_s, edge_e)
@@ -106,7 +98,7 @@ def substep_assignment(nodes_df=None, weighted_edges_df=None, od_ss=None, quarte
         trip_info[(agent_id, trip_origin, trip_destin)][5] = ss_id
         path_i += 1
     
-    new_edges_df = weighted_edges_df[['u', 'v', 'start_nid', 'end_nid', 'fft', 'capacity', 'normal_fft', 'normal_capacity', 'length', 'vol_true', 'vol_tot', 'veh_current', 'geometry']].copy()
+    new_edges_df = weighted_edges_df[['uniqueid', 'u', 'v', 'start_nid', 'end_nid', 'fft', 'capacity', 'normal_fft', 'normal_capacity', 'length', 'vol_true', 'vol_tot', 'veh_current', 'geometry']].copy()
     # new_edges_df = new_edges_df.join(edge_volume, how='left')
     # new_edges_df['vol_ss'] = new_edges_df['vol_ss'].fillna(0)
     # new_edges_df['vol_true'] += new_edges_df['vol_ss']
@@ -117,27 +109,23 @@ def substep_assignment(nodes_df=None, weighted_edges_df=None, od_ss=None, quarte
     new_edges_df['t_avg'] = new_edges_df['fft'] * ( 1 + alpha_f * (new_edges_df['flow']/new_edges_df['capacity'])**beta_f )
     new_edges_df['t_avg'] = np.where(new_edges_df['t_avg']>36000, 36000, new_edges_df['t_avg'])
     new_edges_df['t_avg'] = new_edges_df['t_avg'].round(2)
-    # bay_bridge_links = [76239, 285158, 313500, 425877]
-    # print(new_edges_df.loc[new_edges_df['uniqueid'].isin(bay_bridge_links), ['capacity', 'flow', 't_avg']])
-    # sys.exit(0)
 
     return new_edges_df, od_residual_ss_list, trip_info, agents_path
 
 def write_edge_vol(edges_df=None, simulation_outputs=None, quarter=None, hour=None, scen_nm=None):
     if 'flow' in edges_df.columns:
         if edges_df.shape[0]<10:
-            edges_df[['start_nid', 'end_nid', 'veh_current', 'vol_true', 'vol_tot', 'flow', 't_avg']].to_csv(simulation_outputs+'/edge_vol/edge_vol_hr{}_qt{}_{}.csv'.format(hour, quarter, scen_nm), index=False)
+            edges_df[['uniqueid', 'start_nid', 'end_nid', 'capacity', 'veh_current', 'vol_true', 'vol_tot', 'flow', 't_avg', 'geometry']].to_csv(simulation_outputs+'/edge_vol/edge_vol_hr{}_qt{}_{}.csv'.format(hour, quarter, scen_nm), index=False)
         else:
-            edges_df.loc[edges_df['vol_true']>0, ['start_nid', 'end_nid', 'veh_current', 'vol_true', 'vol_tot', 'flow', 't_avg']].to_csv(simulation_outputs+'/edge_vol/edge_vol_hr{}_qt{}_{}.csv'.format(hour, quarter, scen_nm), index=False)
+            edges_df.loc[edges_df['vol_true']>0, ['uniqueid', 'start_nid', 'end_nid', 'capacity', 'veh_current', 'vol_true', 'vol_tot', 'flow', 't_avg', 'geometry']].to_csv(simulation_outputs+'/edge_vol/edge_vol_hr{}_qt{}_{}.csv'.format(hour, quarter, scen_nm), index=False)
 
 def write_final_vol(edges_df=None, simulation_outputs=None, quarter=None, hour=None, scen_nm=None):
-    edges_df.loc[edges_df['vol_tot']>0, ['start_nid', 'end_nid', 'vol_tot']].to_csv(simulation_outputs+'/edge_vol/final_edge_vol_hr{}_qt{}_{}.csv'.format(hour, quarter, scen_nm), index=False)
+    edges_df.loc[edges_df['vol_tot']>0, ['uniqueid', 'start_nid', 'end_nid', 'vol_tot', 'geometry']].to_csv(simulation_outputs+'/edge_vol/final_edge_vol_hr{}_qt{}_{}.csv'.format(hour, quarter, scen_nm), index=False)
 
 def assignment(quarter_counts=6, substep_counts=15, substep_size=30000, edges_df=None, nodes_df=None, od_all=None, demand_files=None, simulation_outputs=None, scen_nm=None, hour_list=None, quarter_list=None, cost_factor=None, closure_hours=[], closed_links=None, highway_list = [], agent_time_limit=None, sample_interval=1, agents_path = None, alpha_f=0.3, beta_f=4):
 
     od_all['current_nid'] = od_all['origin_nid']
     trip_info = {(getattr(od, 'agent_id'), getattr(od, 'origin_nid'), getattr(od, 'destin_nid')): [0, 0, getattr(od, 'origin_nid'), 0, getattr(od, 'hour'), getattr(od, 'quarter'), 0, 0] for od in od_all.itertuples()}
-    # trip_info = {(getattr(od, 'agent_id'), getattr(od, 'origin_nid'), getattr(od, 'destin_nid')): [0, 0, getattr(od, 'origin_nid'), 0, getattr(od, 'hour'), None, 0] for od in od_all.itertuples()}
     
     ### Quarters and substeps
     ### probability of being in each division of hour
@@ -153,7 +141,6 @@ def assignment(quarter_counts=6, substep_counts=15, substep_size=30000, edges_df
     ### accumulator
     edges_df['vol_tot'] = 0
     edges_df['veh_current'] = 0
-    # tmp_df = edges_df.copy()
     
     ### Loop through days and hours
     for day in ['na']:
@@ -249,31 +236,20 @@ def assignment(quarter_counts=6, substep_counts=15, substep_size=30000, edges_df
 
                     od_residual_list += od_residual_ss_list
                     # write_edge_vol(edges_df=edges_df, simulation_outputs=simulation_outputs, quarter=quarter, hour=hour, scen_nm='ss{}_{}'.format(ss_id, scen_nm))
-                    # tmp_df['weights_{}'.format(ss_id)] = edges_df['t_avg']
-                    # tmp_df['vol_{}'.format(ss_id)] = edges_df['vol_true']
-                    # tmp_df['flow_{}'.format(ss_id)] = edges_df['flow']
                     logging.info('HR {} QT {} SS {} finished, max vol {}, time {}'.format(hour, quarter, ss_id, np.max(edges_df['vol_true']), time.time()-time_ss_0))
-                    # sys.exit(0)
-                    # break
                 
                 ### write quarterly results
                 edges_df['vol_tot'] += edges_df['vol_true']
                 if True: # hour >=16 or (hour==15 and quarter==3):
                     write_edge_vol(edges_df=edges_df, simulation_outputs=simulation_outputs, quarter=quarter, hour=hour, scen_nm=scen_nm)
-                    # plot_edge_flow(edges_df=edges_df, simulation_outputs=simulation_outputs, quarter=quarter, hour=hour, scen_nm=scen_nm)
-                    # tmp_df.to_csv(simulation_outputs+'/edge_vol/edge_vol_hr{}_qt{}_{}.csv'.format(hour, quarter, scen_nm), index=False)
 
             if hour%3 == 0:
                 trip_info_df = pd.DataFrame([[trip_key[0], trip_key[1], trip_key[2], trip_value[0], trip_value[1], trip_value[2], trip_value[3], trip_value[4], trip_value[5]] for trip_key, trip_value in trip_info.items()], columns=['agent_id', 'origin_nid', 'destin_nid', 'travel_time', 'travel_time_used', 'stop_nid', 'stop_hour', 'stop_quarter', 'stop_ssid'])
                 trip_info_df.to_csv(simulation_outputs+'/trip_info/trip_info_{}_hr{}.csv'.format(scen_nm, hour), index=False)
-        # plot_edge_flow(edges_df=edges_df, simulation_outputs=simulation_outputs, quarter=quarter, hour=hour, scen_nm=scen_nm, var='vol_tot')
     
     ### output individual trip travel time and stop location
 
     trip_info_df = pd.DataFrame([[trip_key[0], trip_key[1], trip_key[2], trip_value[0], trip_value[1], trip_value[2], trip_value[3], trip_value[4], trip_value[5]] for trip_key, trip_value in trip_info.items()], columns=['agent_id', 'origin_nid', 'destin_nid', 'travel_time', 'travel_time_used', 'stop_nid', 'stop_hour', 'stop_quarter', 'stop_ssid'])
     trip_info_df.to_csv(simulation_outputs+'/trip_info/trip_info_{}.csv'.format(scen_nm), index=False)
-
-    # with open(simulation_outputs+'/trip_info/agents_path_{}.json'.format(scen_nm), 'w+') as outfile:
-    #     json.dump(agents_path, outfile, indent=2)
 
     write_final_vol(edges_df=edges_df, simulation_outputs=simulation_outputs, quarter=quarter, hour=hour, scen_nm=scen_nm)
