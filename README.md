@@ -1,6 +1,6 @@
 # Semi-dynamic traffic assignment with residual demand for SimCenter R2D
 
-![Bay Area Congestion](/images/alamedacounty_congestion.jpg)
+![Bay Area Congestion](/images/alamedacounty_congestion.png)
 
 ### Features
 * Quasi-equilibrium traffic assignment
